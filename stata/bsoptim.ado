@@ -8,7 +8,7 @@
 ** after fitting a logistic regression model
 
 program define bsoptim, rclass
-version 12.1
+version 11.0
 syntax [, reps(integer 200) estname(name)]
 tempvar pred  // variable to hold predictions from the models
 tempvar insample // variable to flag the estimation sample
