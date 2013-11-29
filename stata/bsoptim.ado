@@ -1,5 +1,5 @@
 *! bsoptim
-*! v0.1
+*! v0.2
 *! Author:      David C Muller 
 *! Email:       <davidmull@gmail.com> 
 *! Repository:  <https://github.com/dcmuller/bsoptim>
@@ -24,7 +24,7 @@ if "`estname'" != "" {
 est store `model'
 gen `insample' = e(sample)
 local sampsize = e(N)
-local call = e(cmdline)
+local call `e(cmdline)'
 local yvar = e(depvar)
 
 di "{txt} Bootstrap optimism corrected c-statistic"
