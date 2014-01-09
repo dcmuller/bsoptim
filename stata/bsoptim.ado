@@ -1,18 +1,18 @@
 *! bsoptim
-*! v0.2
+*! v0.3
 *! Author:      David C Muller 
 *! Email:       <davidmull@gmail.com> 
 *! Repository:  <https://github.com/dcmuller/bsoptim>
 ** 
 ** Command to calculate the bootstrap optimism corrected c-statistic
-** after fitting a logistic regression model
+** after fitting a logistic regression model, or a survival model
 
 program define bsoptim, rclass
 version 11.0
-syntax [, reps(integer 200) estname(name)]
+syntax, estname(name) classvar(varname) [reps(integer 200) predopts(string) complement]
 tempvar pred  // variable to hold predictions from the models
 tempvar insample // variable to flag the estimation sample
-tempname o corrected model
+tempname c o corrected model bsmodel
 
 // initialise scalar to hold the sum of optimism
 scalar `o' = 0
@@ -25,14 +25,25 @@ est store `model'
 gen `insample' = e(sample)
 local sampsize = e(N)
 local call `e(cmdline)'
-local yvar = e(depvar)
+local yvar "`classvar'"
+local wgt ""
+if "`e(wtype)'" != "" {
+  local wgt "[`e(wtype)' `e(wexp)']"
+}
+
 
 di "{txt} Bootstrap optimism corrected c-statistic"
 di "{txt} Numer of bootstrap replications = `reps'"
 
 // apparent c from full model
-qui lroc, nograph
-local c_app = r(area)
+qui predict double `pred' if `insample', `predopts'
+if "`complement'" != "" {
+  qui replace `pred' = 1 - `pred'
+}
+qui somersd `yvar' `pred' if `insample' `wgt', transf(c)
+mat `c' = e(b)
+local c_app = `c'[1,1]
+drop `pred'
 *di `c_app'
 
 // loop over bootstrap samples
@@ -41,13 +52,24 @@ while `i' <= `reps' {
   preserve
   bsample `sampsize' if `insample'
   qui `call' 
+  est store `bsmodel'
   assert e(N)==`sampsize'
-  qui lroc, nograph
-  local c_boot = r(area)
+  predict double `pred' if e(sample), `predopts'
+  if "`complement'" != "" {
+    qui replace `pred' = 1 - `pred'
+  }
+  qui somersd `yvar' `pred' if e(sample) `wgt', transf(c)
+  mat `c' = e(b)
+  local c_boot = `c'[1,1]
   restore
-  predict `pred' if `insample', pr
-  qui roctab `yvar' `pred'
-  local c_orig = r(area)
+  qui est restore `bsmodel'
+  qui predict double `pred' if `insample', `predopts'
+  if "`complement'" != "" {
+    qui replace `pred' = 1 - `pred'
+  }
+  qui somersd `yvar' `pred' `wgt', transf(c)
+  mat `c' = e(b)
+  local c_orig = `c'[1,1]
   scalar `o' = `o' + (`c_boot' - `c_orig')
   *di scalar(`o')
   drop `pred'
