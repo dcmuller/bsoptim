@@ -9,10 +9,12 @@
 
 program define bsoptim, rclass
 version 11.0
-syntax, estname(name) classvar(varname) [reps(integer 200) predopts(string) complement]
+syntax, estname(name) classvar(varname) [reps(integer 200) cluster(varname) predopts(string) complement]
 tempvar pred  // variable to hold predictions from the models
 tempvar insample // variable to flag the estimation sample
-tempname c o corrected model bsmodel
+tempvar idx // variable to flag the number of clusters (if cluster specified)
+tempname c o corrected model bsmodel clstid
+
 
 // initialise scalar to hold the sum of optimism
 scalar `o' = 0
@@ -29,6 +31,13 @@ local yvar "`classvar'"
 local wgt ""
 if "`e(wtype)'" != "" {
   local wgt "[`e(wtype)' `e(wexp)']"
+}
+
+if "`cluster'" != "" {
+  local clstopt "cluster(`cluster') idcluster(`clstid')"
+  bys `cluster': gen `idx'=_n==1
+  qui count if `idx' & `insample'
+  local nclust = r(N)
 }
 
 
@@ -50,10 +59,20 @@ drop `pred'
 local i=1
 while `i' <= `reps' {
   preserve
-  bsample `sampsize' if `insample'
+  if "`cluster'" !="" {
+    local ndraw `nclust'
+  }
+  else {
+    local ndraw `sampsize'
+  }
+  bsample `ndraw' if `insample', `clstopt'
+  if "`clstopt'" != "" {
+    qui replace `cluster'=`clstid'
+  }
+
   qui `call' 
   est store `bsmodel'
-  assert e(N)==`sampsize'
+  *assert e(N)==`sampsize'
   predict double `pred' if e(sample), `predopts'
   if "`complement'" != "" {
     qui replace `pred' = 1 - `pred'
